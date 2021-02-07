@@ -1,72 +1,142 @@
-/*
-  MCP3008.cpp - Library for communicating with MCP3008 Analog to digital converter.
-  Created by Uros Petrevski, Nodesign.net 2013
-  Released into the public domain.
-  
-  ported from Python code originaly written by Adafruit learning system for rPI :
-  http://learn.adafruit.com/send-raspberry-pi-data-to-cosm/python-script
-*/
-
-#include "wiringPi.h"
-#include "wiringPiSPI.h"
 #include "MCP3008.h"
-
-MCP3008::MCP3008(int clockpin, int mosipin, int misopin, int cspin) {
-    
-    // define SPI outputs and inputs for bitbanging
-    
-    _cspin = cspin;
-    _clockpin = clockpin;
-    _mosipin = mosipin;
-    _misopin = misopin;
-    
-    pinMode(_cspin, OUTPUT);
-    pinMode(_clockpin, OUTPUT);
-    pinMode(_mosipin, OUTPUT);
-    pinMode(_misopin, INPUT);
-    
-}
-
-// read SPI data from MCP3008 chip, 8 possible adc's (0 thru 7)
-int MCP3008::readADC(int adcnum) {
-
-  if ((adcnum > 7) || (adcnum < 0)) return -1; // Wrong adc address return -1
-
-  // algo
-  digitalWrite(_cspin, HIGH);
-
-  digitalWrite(_clockpin, LOW); //  # start clock low
-  digitalWrite(_cspin, LOW); //     # bring CS low
-
-  int commandout = adcnum;
-  commandout |= 0x18; //  # start bit + single-ended bit
-  commandout <<= 3; //    # we only need to send 5 bits here
+using namespace std;
+/**********************************************************
+ * spiOpen() :function is called by the constructor.
+ * It is responsible for opening the spidev device
+ * "devspi" and then setting up the spidev interface.
+ * private member variables are used to configure spidev.
+ * They must be set appropriately by constructor before calling
+ * this function.
+ * *********************************************************/
+int MCP3008::spiOpen(std::string devspi){
+    int statusVal = -1;
+    this->spifd = open(devspi.c_str(), O_RDWR);
+    if(this->spifd < 0){
+        perror("could not open SPI device");
+        exit(1);
+    }
  
-  for (int i=0; i<5; i++) {
-    if (commandout & 0x80) 
-      digitalWrite(_mosipin, HIGH);
-    else   
-      digitalWrite(_mosipin, LOW);
-      
-    commandout <<= 1;
-    digitalWrite(_clockpin, HIGH);
-    digitalWrite(_clockpin, LOW);
-
-  }
-
-  int adcout = 0;
-  // read in one empty bit, one null bit and 10 ADC bits
-  for (int i=0; i<12; i++) {
-    digitalWrite(_clockpin, HIGH);
-    digitalWrite(_clockpin, LOW);
-    adcout <<= 1;
-    if (digitalRead(_misopin))
-      adcout |= 0x1;
-  } 
-  digitalWrite(_cspin, HIGH);
-
-  adcout >>= 1; //      # first bit is 'null' so drop it
-  return adcout;
+    statusVal = ioctl (this->spifd, SPI_IOC_WR_MODE, &(this->mode));
+    if(statusVal < 0){
+        perror("Could not set SPIMode (WR)...ioctl fail");
+        exit(1);
+    }
+ 
+    statusVal = ioctl (this->spifd, SPI_IOC_RD_MODE, &(this->mode));
+    if(statusVal < 0) {
+      perror("Could not set SPIMode (RD)...ioctl fail");
+      exit(1);
+    }
+ 
+    statusVal = ioctl (this->spifd, SPI_IOC_WR_BITS_PER_WORD, &(this->bitsPerWord));
+    if(statusVal < 0) {
+      perror("Could not set SPI bitsPerWord (WR)...ioctl fail");
+      exit(1);
+    }
+ 
+    statusVal = ioctl (this->spifd, SPI_IOC_RD_BITS_PER_WORD, &(this->bitsPerWord));
+    if(statusVal < 0) {
+      perror("Could not set SPI bitsPerWord(RD)...ioctl fail");
+      exit(1);
+    }  
+ 
+    statusVal = ioctl (this->spifd, SPI_IOC_WR_MAX_SPEED_HZ, &(this->speed));    
+    if(statusVal < 0) {
+      perror("Could not set SPI speed (WR)...ioctl fail");
+      exit(1);
+    }
+ 
+    statusVal = ioctl (this->spifd, SPI_IOC_RD_MAX_SPEED_HZ, &(this->speed));    
+    if(statusVal < 0) {
+      perror("Could not set SPI speed (RD)...ioctl fail");
+      exit(1);
+    }
+    return statusVal;
 }
-
-
+ 
+/***********************************************************
+ * spiClose(): Responsible for closing the spidev interface.
+ * Called in destructor
+ * *********************************************************/
+ 
+int MCP3008::spiClose(){
+    int statusVal = -1;
+    statusVal = close(this->spifd);
+        if(statusVal < 0) {
+      perror("Could not close SPI device");
+      exit(1);
+    }
+    return statusVal;
+}
+ 
+/********************************************************************
+ * This function writes data "data" of length "length" to the spidev
+ * device. Data shifted in from the spidev device is saved back into
+ * "data".
+ * ******************************************************************/
+int MCP3008::spiWriteRead( unsigned char *data, int length){
+ 
+  struct spi_ioc_transfer spi[length];
+  int i = 0;
+  int retVal = -1; 
+  bzero(spi, sizeof spi); // ioctl struct must be zeroed 
+ 
+// one spi transfer for each byte
+ 
+  for (i = 0 ; i < length ; i++){
+ 
+    spi[i].tx_buf        = (unsigned long)(data + i); // transmit from "data"
+    spi[i].rx_buf        = (unsigned long)(data + i) ; // receive into "data"
+    spi[i].len           = sizeof(*(data + i)) ;
+    spi[i].delay_usecs   = 0 ;
+    spi[i].speed_hz      = this->speed ;
+    spi[i].bits_per_word = this->bitsPerWord ;
+    spi[i].cs_change = 0;
+}
+ 
+ retVal = ioctl (this->spifd, SPI_IOC_MESSAGE(length), &spi) ;
+ 
+ if(retVal < 0){
+    perror("Problem transmitting spi data..ioctl");
+    exit(1);
+ }
+ 
+return retVal;
+ 
+}
+ 
+/*************************************************
+ * Default constructor. Set member variables to
+ * default values and then call spiOpen()
+ * ***********************************************/
+ 
+MCP3008::MCP3008(){
+    this->mode = SPI_MODE_0 ;
+    this->bitsPerWord = 8;
+    this->speed = 1000000;
+    this->spifd = -1;
+ 
+    this->spiOpen(std::string("/dev/spidev0.0"));
+ 
+    }
+ 
+/*************************************************
+ * overloaded constructor. let user set member variables to
+ * and then call spiOpen()
+ * ***********************************************/
+MCP3008::MCP3008(std::string devspi, unsigned char spiMode, unsigned int spiSpeed, unsigned char spibitsPerWord){
+    this->mode = spiMode ;
+    this->bitsPerWord = spibitsPerWord;
+    this->speed = spiSpeed;
+    this->spifd = -1;
+ 
+    this->spiOpen(devspi);
+ 
+}
+ 
+/**********************************************
+ * Destructor: calls spiClose()
+ * ********************************************/
+MCP3008::~MCP3008(){
+    this->spiClose();
+}

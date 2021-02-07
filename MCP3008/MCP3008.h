@@ -1,25 +1,57 @@
-/*
-  MCP3008.h - Library for communicating with MCP3008 Analog to digital converter.
-  Created by Uros Petrevski, Nodesign.net 2013
-  Released into the public domain.
-  
-  ported from Python code originaly written by Adafruit learning system for rPI :
-  http://learn.adafruit.com/send-raspberry-pi-data-to-cosm/python-script
-*/
+/***********************************************************************
+ * This header file contains the mcp3008Spi class definition.
+ * Its main purpose is to communicate with the MCP3008 chip using
+ * the userspace spidev facility.
+ * The class contains four variables:
+ * mode        -> defines the SPI mode used. In our case it is SPI_MODE_0.
+ * bitsPerWord -> defines the bit width of the data transmitted.
+ *        This is normally 8. Experimentation with other values
+ *        didn't work for me
+ * speed       -> Bus speed or SPI clock frequency. According to
+ *                https://projects.drogon.net/understanding-spi-on-the-raspberry-pi/
+ *            It can be only 0.5, 1, 2, 4, 8, 16, 32 MHz.
+ *                Will use 1MHz for now and test it further.
+ * spifd       -> file descriptor for the SPI device
+ *
+ * The class contains two constructors that initialize the above
+ * variables and then open the appropriate spidev device using spiOpen().
+ * The class contains one destructor that automatically closes the spidev
+ * device when object is destroyed by calling spiClose().
+ * The spiWriteRead() function sends the data "data" of length "length"
+ * to the spidevice and at the same time receives data of the same length.
+ * Resulting data is stored in the "data" variable after the function call.
+ * ****************************************************************************/
 
 #ifndef MCP3008_h
 #define MCP3008_h
 
-#include "wiringPi.h"
-#include "wiringPiSPI.h"
+#include <unistd.h>
+#include <stdint.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/spi/spidev.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string>
+#include <iostream>
 
 class MCP3008
 {
   public:
-    MCP3008(int clockpin, int mosipin, int misopin, int cspin);
-    int readADC(int adcnum);
+    MCP3008();
+    MCP3008(std::string devspi, unsigned char spiMode, unsigned int spiSpeed, unsigned char spibitsPerWord);
+    ~MCP3008();
+    int spiWriteRead(unsigned char *data, int length);
   private:
-      int _clockpin, _mosipin, _misopin, _cspin;
+    unsigned char mode;
+    unsigned char bitsPerWord;
+    unsigned int speed;
+    int spifd;
+     
+    int spiOpen(std::string devspi);
+    int spiClose();
 };
 
 

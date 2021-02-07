@@ -8,7 +8,7 @@
 #define MOSI_PIN 19
 #define MISO_PIN 21
 
-MCP3008 adc(CLOCK_PIN, MOSI_PIN, MISO_PIN, CS_PIN);
+MCP3008 adc("/dev/spidev0.0", SPI_MODE_0, 1000000, 8);
 
 static int readADC(lua_State *L){
     if(lua_isnumber(L, 1))
