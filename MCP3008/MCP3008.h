@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string>
 #include <iostream>
+#include <cassert>
 
 class MCP3008
 {
@@ -44,6 +45,7 @@ class MCP3008
     MCP3008(std::string devspi, unsigned char spiMode, unsigned int spiSpeed, unsigned char spibitsPerWord);
     ~MCP3008();
     int spiWriteRead(unsigned char *data, int length);
+    int readChannel(int channel);
   private:
     unsigned char mode;
     unsigned char bitsPerWord;

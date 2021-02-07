@@ -104,6 +104,25 @@ int MCP3008::spiWriteRead( unsigned char *data, int length){
 return retVal;
  
 }
+
+int MCP3008::readChannel(int channel)
+{
+  if (channel>=0&&channel<8){
+    unsigned char data[3];
+    int value;
+    data[0] = 1;  //  first byte transmitted -> start bit
+    data[1] = 0b10000000 |( ((channel & 7) << 4)); // second byte transmitted -> (SGL/DIF = 1, D2=D1=D0=0)
+    data[2] = 0; // third byte transmitted....don't care
+  
+    spiWriteRead(data, sizeof(data));
+  
+    value = 0;
+    value = (data[1]<< 8) & 0b1100000000; //merge data[1] & data[2] to get result
+    value |=  (data[2] & 0xff);
+    return value;
+  }
+  return -1;
+}
  
 /*************************************************
  * Default constructor. Set member variables to

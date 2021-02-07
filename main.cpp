@@ -1,20 +1,15 @@
 #include <stdio.h>
 #include <cassert>
 #include "lua-5.4.2/src/lua.hpp"
-#include "MCP3008/MCP3008.h"
-
-#define CS_PIN 24
-#define CLOCK_PIN 23
-#define MOSI_PIN 19
-#define MISO_PIN 21
+#include "MCP3008/MCP3008.hpp"
 
 MCP3008 adc("/dev/spidev0.0", SPI_MODE_0, 1000000, 8);
 
-static int readADC(lua_State *L){
+static int readChannel(lua_State *L){
     if(lua_isnumber(L, 1))
     {
         int channel = (int)lua_tonumber(L, 1);
-        int result = adc.readADC(channel);
+        int result = adc.readChannel(channel);
         lua_pushnumber(L, result);
         return 1;
     }
@@ -22,7 +17,7 @@ static int readADC(lua_State *L){
 }
 
 static luaL_Reg ADCLib[] = {
-    {"readADC", readADC},
+    {"readChannel", readChannel},
     {NULL, NULL}
 };
 
