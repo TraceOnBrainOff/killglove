@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <cassert>
-#include "lua-5.4.2/src/lua.hpp"
+#include "../lua-5.4.2/src/lua.hpp"
 #include "MCP3008/MCP3008.hpp"
 
 MCP3008 adc("/dev/spidev0.0", SPI_MODE_0, 1000000, 8);

@@ -4,8 +4,7 @@ function init()
 	print("init loaded")
 end
 
-function update(dt)
-	--io.write("eee")
+function update(dt) --add calculating of the delta on the cpp side
 	--for i,v in pairs(_ENV) do
 	--	print(i)
 	--end
